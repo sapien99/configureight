@@ -1,0 +1,5 @@
+- key: "basevar3"    
+  value: |
+    foo: bar
+    baz: qux
+    ox: 9

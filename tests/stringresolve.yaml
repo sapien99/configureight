@@ -1,0 +1,4 @@
+- key: "yaml_static_string_key"    
+  value: "$[echo: YAML some other]_STATIC STRING VALUE"        
+- key: "yaml_static_string_key_with_nonexistent_function"    
+  value: "$[foo: something]_STATIC STRING VALUE"          

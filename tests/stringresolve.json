@@ -1,0 +1,16 @@
+[    
+    {
+        "key": "static_string_key",
+        "value": "STATIC STRING VALUE"        
+    },
+    {
+        "key": "string_key_reference_1",
+        "value": "STRING KEY REFERENCING $[ref: static_string_key]",
+        "_enabled": true,
+        "_substitute": false
+    },    
+    {
+        "key": "string_key_referencing_nonexistent_key",
+        "value": "STRING KEY REFERENCING ${nonexistent_key}"        
+    }
+]

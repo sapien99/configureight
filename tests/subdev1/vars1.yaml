@@ -1,0 +1,4 @@
+- key: "subenvdevvar1"    
+  value: "envdevvar1"        
+- key: "subenvdevvar2"    
+  value: ${envdevvar1}.${envdevvar2}

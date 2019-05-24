@@ -1,0 +1,8 @@
+# custom script aliases, references by $[echo: xxx]
+scripts:
+  echo: "echo -n"  
+# allowed python inline functions
+functions:
+  - int  
+# loglevel
+# loglevel: DEBUG
