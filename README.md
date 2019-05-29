@@ -150,7 +150,7 @@ con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 -o values.yaml
 ### Inputfile
 the inputfile option is quite handy when you dont want to have ALL the keys in the output. Passing a yaml file as input containing a list of keys to resolve will result in just these keys to be resolved. Keys references by those will also be resolved of course, but wont appear in the output
 ```sh
-con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 -i demo/keylist.yaml -o values.yaml
+con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 -i tests/keylist.yaml -o values.yaml
 
 {
   "echoedString": "ECHOED somestring envdev"
