@@ -7,3 +7,4 @@ functions:
   - int  
 # loglevel
 loglevel: DEBUG
+stacks: true

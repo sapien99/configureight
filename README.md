@@ -132,7 +132,7 @@ scripts:
 # allowed python inline functions. Default: all buildin but import
 functions:
   - int  
-# loglevel. Default ERROR with no stacks printed
+# loglevel. Default WARN with no stacks printed
 loglevel: DEBUG
 stacks: true
 ```

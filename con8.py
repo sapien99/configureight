@@ -6,8 +6,7 @@ import logging
 import argparse
 import json
 import yaml
-import builtins
-from subprocess import run, PIPE
+import subprocess
 from datetime import datetime
 
 logging.basicConfig(level=logging.DEBUG)
@@ -17,12 +16,12 @@ LOGGER.setLevel(logging.WARNING)
 def possible_abort(e, fail_on_error):        
     LOGGER.error(e)
     if fail_on_error:
-        if os.environ.get('SHOWSTACKS'):
+        if os.environ.get('SHOWSTACKS') or ConfigResolver.global_config.get('stacks') == True:
             raise Error(e)
         else:
             sys.exit(8)
     else:
-        print('WARNING: Exception occured but suppressed:' %e)
+        LOGGER.warning('Exception occured but suppressed:' %e)
 
 def handle_outputformat(args, result):
     if args.outputformat == 'yaml':
@@ -30,7 +29,7 @@ def handle_outputformat(args, result):
     elif args.outputformat == 'json':
         output = json.dumps(result, sort_keys=True, indent=2)
     else:
-        print('Unknown outputformat %s' %args.outputformat)
+        LOGGER.error('Unknown outputformat %s' %args.outputformat)
         sys.exit(8)        
     return output
 
@@ -69,7 +68,7 @@ class ConfigReader:
     values = {}
 
     def read_file(self, file):
-            with open(file, 'rb') as ifile:
+            with open(file, 'r+', encoding="utf-8") as ifile:
                 return ifile.read()
 
     def handle_list(self, data, file=None):
@@ -122,7 +121,7 @@ class ConfigReader:
         data = None
         try:
             if extension == '.json':            
-                data = json.loads(self.read_file(file))                                    
+                data = json.loads(self.read_file(file))
             if extension in ['.yaml', '.yml']:            
                 data = yaml.safe_load(self.read_file(file))                 
         except Exception as e:
@@ -223,12 +222,28 @@ class ConfigResolver:
                     if command_string:                    
                         start = datetime.now()
                         LOGGER.debug('Script %s exec >%s<' %(ref, command_string + " ".join([parms])))
-                        result = run(command_string.split(' ') + [parms], capture_output=True, timeout=5000, shell=False, stdin=PIPE)                    
-                        LOGGER.debug('Script %s took %sms' %(ref, datetime.now() - start))
-                        if result.stdout != None:
-                            key.value = key.value.replace('$[%s:%s]' % (ref, parms), result.stdout.decode('utf8'))                            
+                        subprocess_run = False
+                        try:
+                            if subprocess.run != None:
+                                subprocess_run = True
+                        except Exception as e:
+                            pass
+
+                        if subprocess_run:
+                            result = subprocess.run(command_string.split(' ') + [parms], capture_output=True, timeout=5000, shell=False, stdin=subprocess.PIPE)
+                            LOGGER.debug('Script %s took %sms' %(ref, datetime.now() - start))
+                            if result.stdout != None:
+                                key.value = key.value.replace('$[%s:%s]' % (ref, parms), result.stdout.decode('utf8'))
+                            returncode = result.returncode
+                        else:
+                            out = subprocess.Popen(command_string.split(' ') + [parms],stderr=subprocess.STDOUT,stdout=subprocess.PIPE)
+                            stdout, returncode = out.communicate()[0],out.returncode
+                            LOGGER.debug('Script %s took %sms' %(ref, datetime.now() - start))
+                            if stdout != None:
+                                key.value = key.value.replace('$[%s:%s]' % (ref, parms), stdout.decode('utf8'))
+
                         # TODO: why curl gets a RC 3 here even if its works?
-                        if result.returncode > 3:
+                        if returncode > 3:
                             LOGGER.warning('Script %s abended with %s (stdout: %s, stderr: %s)' %(ref, result.returncode, result.stdout, result.stderr))
                             possible_abort("Script %s aborted in key %s" %(ref, result.returncode), fail_on_error)
                     else:                        
@@ -303,6 +318,9 @@ class ConfigResolver:
         return key
 
     def __init__(self, key_set, config={}):        
+        ConfigResolver.global_config = {
+           'loglevel': logging.WARN
+        }
         self.key_set = key_set
         self.config = config
 
@@ -329,9 +347,9 @@ if __name__== "__main__":
     parser.add_argument('--ignoreerrors', action='store_true', default=False, help='Continue on errors, will set @@ eyecatcher for errors', required=False)        
     args = parser.parse_args()
     global_config_file = args.config
+    # first set logger to info to display info about config location etc.
     if not global_config_file:
-        global_config_file = os.environ.get('CONFIG', './config.yaml')
-
+        global_config_file = os.environ.get('CONFIG', os.path.join(os.getcwd(), 'con8.yaml'))
     if os.path.exists(global_config_file):
         try:
             with open(global_config_file, 'rb') as file:
@@ -339,10 +357,7 @@ if __name__== "__main__":
                 ConfigResolver.global_config = yaml.safe_load(file.read())                             
         except Exception as e:
             possible_abort('File %s could not be read: %s' %(args.inputfile, e), True)
-
-    if not ConfigResolver.global_config.get('loglevel'):
-        ConfigResolver.global_config['loglevel'] = logging.WARN
-    LOGGER.setLevel(ConfigResolver.global_config['loglevel'])
+        LOGGER.setLevel(ConfigResolver.global_config['loglevel'])
 
     # None will resolve all the keys
     keys_to_resolve = []
