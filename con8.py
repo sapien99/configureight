@@ -273,6 +273,8 @@ class ConfigResolver:
                 pass
 
     def resolve_keys(self, keys=[], fail_on_error=True):
+        if not keys:
+            keys = []
         return_value = {}
         if len(keys) == 0:
             keys = self.key_set.keys()
