@@ -1,8 +1,113 @@
 # Configur8
 [![Build Status](https://travis-ci.org/joemccann/dillinger.svg?branch=master)](https://travis-ci.org/sapien99/configur8)
 
-Configur8 (Configurate) is a tool for generating configuration using overlays and nested variables. Its mainly thought to be used with creating helms values.yaml but can be use in various ways.
+Configur8 (Configurate) is a tool for generating configuration using overlays and nested variables. It returns a dict of variables which can be the input for resolving templates, helms values.yaml etc. All the mentioned examples are part of the tests folder, so feel free to play around
 
+## Usage
+```sh
+usage: con8.py [-h] -p PATH [PATH ...] [-c CONFIG] [-o OUTPUTFILE]
+               [-i INPUTFILE] [--outputformat OUTPUTFORMAT] [--origins]
+               [--ignoreerrors]
+con8.py: error: argument -p/--path is required
+```
+
+### Paths and Structure
+configur8 works on a folders containing files which hold config keyvals. Those folders are used for overriding. A simple example could look like the following. The base folder contains general values, envs/dev and envs/prod values for specific environments and apps/app1 contains application specific values. 
+
+```sh
+base 
+  base_vars.yaml  
+envs
+  dev
+    dev_vars.yaml  
+  prod
+    prod_vars.yaml  
+apps
+  app1
+    app1_vars.yaml  
+```
+
+In the following example the keyvals from all the files in folder "base" (and possible dependent folders of it) are scanned for key-value pairs. After base was done those keyvals get extended/overridden with the keyvals from folder envs/devapp1, and after that apps/app1 bring additional variables in. After the variable-list is built the variables are resolved and the final output is generated and written to the file output.yaml 
+
+```sh
+con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 -o output.yaml
+```
+
+### Defining Variables
+The previous sample mentioned files containing configuration keyvals. Configuration keys can be defined either in json or in yaml - whatever you prefer. You can use the "object-notation" like notation where each variable file contains an array of config key definitions. Beside the key name and its value there is also an optional meta-variable: substituted. Its quite handy when you have sequences like ${}, $(), $[] which are used as eyecatchers by configur8. You can either escape them in the values using a backslash \${} or you can disable the substitution of this key as a whole.
+
+```yaml
+- key: "someKey"    
+  value: "some value"
+- key: "someOtherKey"    
+  value: "some other ${value}",
+  substitute: false
+```
+or in json
+```javascript
+[
+ {
+  "key": "someKey",
+  "value": "some value"
+ },
+ {
+  "key": "someOtherKey",
+  "value": "some other value",
+  "substitute": false
+ }
+]
+```
+If this seems to be too complex you can use the dict-notation - which is a bit less to write. Metavars can also be used by defining a meta-var (which wont appear in the output) with a special suffix.
+```yaml
+someKey:"some value"
+someOtherKey: "some other ${value}"
+someOtherKey._substitute: false
+```
+or
+```javascript
+{
+  "someKey":"some value",
+  "someOtherKey": "some other ${value}",
+  "someOtherKey._substitute": false
+}
+```
+
+### Resolving only dedicated keys
+the inputfile option is quite handy when you dont want to have ALL the keys in the output. Passing a yaml file as input containing a list of keys to resolve will result in just these keys to be resolved. Keys references by those will also be resolved of course, but wont appear in the output
+```sh
+con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 -i tests/keylist.yaml
+
+{
+  "echoedString": "ECHOED somestring envdev"
+}
+```
+### Output Format
+One can specify the output format (either yaml or json) using the --outputformat parameter. Default is yaml
+```sh
+con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 --outputformat json
+```
+### Show key Origins
+Your structure may become quite complex in a real world example of bigger applications. The --origin argument should help there. Instead of printing the values for the keys it prints the source file the key was taken from.
+```sh
+con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 --origins
+
+"basevar1": "tests/base/base_vars.yaml",
+"basevar2": "tests/base/base_vars.yaml",
+"echoedString": "tests/apps/app1/app1_vars.yaml",
+"env.name": "tests/envs/dev/dev_vars.yaml",
+"integerEight": "tests/apps/app1/app1_vars.yaml",
+"nosubstitutationKeyFromDict": "tests/apps/app1/app1_vars_dict.yaml",
+"offset": "tests/envs/dev/dev_vars.yaml",
+"port": "tests/apps/app1/app1_vars.yaml",
+"stringEight": "tests/base/base_vars.yaml",
+"stringKeyFromDict": "tests/apps/app1/app1_vars_dict.yaml",
+"upperCaseEnvname": "tests/apps/app1/app1_vars.yaml"
+```
+### IgnoreErrors
+If you really want to resolve even in case of an error (an undefined function, a mistyped and therefore not found key etc.) use the --ignoreerrors argument. This makes just sense in edge cases but you should avoid it
+```sh
+con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 --ignoreerrors
+```
 ## Tech
 Configur8 is written in python3.6 and is dependent on pyyaml for yaml parsing. Releases for windows and linux (created with pyinstaller) will provide RTR binaries for linux, mac and windows without installing anything
 
@@ -85,43 +190,6 @@ externalIp=$[ipify:]
 echoedString=$[echo:somestring ${externalIp}]
 ```
 ### Defining Configuration Keys
-Configuration keys can be defined either in json or in yaml - whatever you prefer. You can use the "object-notation" like notation where each variable file contains an array of config key definitions. Beside the key name and its value there is also an optional meta-variable: substituted. Its quite handy when you have sequences like ${}, $(), $[] which are used as eyecatchers by configur8. You can either escape them in the values using a backslash \${} or you can disable the substitution of this key as a whole.
-
-```yaml
-- key: "someKey"    
-  value: "some value"
-- key: "someOtherKey"    
-  value: "some other ${value}",
-  substitute: false
-```
-or in json
-```javascript
-[
- {
-  "key": "someKey",
-  "value": "some value"
- },
- {
-  "key": "someOtherKey",
-  "value": "some other value",
-  "substitute": false
- }
-]
-```
-If this seems to be too complex you can use the dict-notation - which is a bit less to write. Metavars can also be used by defining a meta-var (which wont appear in the output) with a special suffix.
-```yaml
-someKey:"some value"
-someOtherKey: "some other ${value}"
-someOtherKey._substitute: false
-```
-or
-```javascript
-{
-  "someKey":"some value",
-  "someOtherKey": "some other ${value}",
-  "someOtherKey._substitute": false
-}
-```
 ### Configuration
 The configuration file controls which python inline functions are allowed, the references to external scripts and things like the current loglevel or if stacktraces should be displayed in error cases. It can be specified using the -c or --configuration option or will implicitly be searched as a con8.yaml in the working directory. If no configuration is found the default values will be used 
 ```bash
@@ -136,51 +204,3 @@ functions:
 loglevel: DEBUG
 stacks: true
 ```
-
-## Usage
-Lets take the structure from the previous chapter as a sample. This will print the values in yaml format to stdout
-```sh
-con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 
-```
-### Outputfile
-you can also specify a dedicated output file using the -o or --output argument
-```sh
-con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 -o values.yaml
-```
-### Inputfile
-the inputfile option is quite handy when you dont want to have ALL the keys in the output. Passing a yaml file as input containing a list of keys to resolve will result in just these keys to be resolved. Keys references by those will also be resolved of course, but wont appear in the output
-```sh
-con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 -i tests/keylist.yaml -o values.yaml
-
-{
-  "echoedString": "ECHOED somestring envdev"
-}
-```
-### IgnoreErrors
-If you really want to resolve even in case of an error (an undefined function, a mistyped and therefore not found key etc.) use the --ignoreerrors argument. This makes just sense in edge cases but you should avoid it
-```sh
-con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 --ignoreerrors
-```
-### Output Format
-One can specify the output format (either yaml or json) using the --outputformat parameter. Default is yaml
-```sh
-con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 --outputformat json
-```
-### Origin
-The overlays etc. may become quite complex in a bigger real world example. The --origin argument should help there. Using this argument prints the origin files the keys were taken from instead of the keys values.
-```sh
-con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 --origin
-
-"basevar1": "tests/base/base_vars.yaml",
-"basevar2": "tests/base/base_vars.yaml",
-"echoedString": "tests/apps/app1/app1_vars.yaml",
-"env.name": "tests/envs/dev/dev_vars.yaml",
-"integerEight": "tests/apps/app1/app1_vars.yaml",
-"nosubstitutationKeyFromDict": "tests/apps/app1/app1_vars_dict.yaml",
-"offset": "tests/envs/dev/dev_vars.yaml",
-"port": "tests/apps/app1/app1_vars.yaml",
-"stringEight": "tests/base/base_vars.yaml",
-"stringKeyFromDict": "tests/apps/app1/app1_vars_dict.yaml",
-"upperCaseEnvname": "tests/apps/app1/app1_vars.yaml"
-```
-
