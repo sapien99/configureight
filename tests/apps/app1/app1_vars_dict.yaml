@@ -1,0 +1,6 @@
+# a string key
+stringKeyFromDict: "stringKeyFromDict"
+# a key which disabled substitutation
+nosubstitutationKeyFromDict: "${this key should not be substituted}"
+nosubstitutationKeyFromDict._substitute: false
+  

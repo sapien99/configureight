@@ -1,0 +1,10 @@
+- key: "port"    
+  value: $(5+${offset})
+- key: "upperCaseEnvname"    
+  value: $("${env.name}".upper())
+- key: "integerEight"
+  value: "$(int(${stringEight}))"
+#- key: "externalIp"
+#  value: "$[ipify:]"
+- key: "echoedString"
+  value: $[echo:somestring ${env.name}]

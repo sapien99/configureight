@@ -1,8 +1,9 @@
 # custom script aliases, references by $[echo: xxx]
 scripts:
-  echo: "echo -n"  
+  echo: "echo -n ECHOED"  
+  ipify: "curl --silent https://api.ipify.org"  
 # allowed python inline functions
 functions:
   - int  
 # loglevel
-# loglevel: DEBUG
+loglevel: DEBUG

@@ -1,4 +1,0 @@
-- key: "envdevvar1"    
-  value: "envdevvar1"        
-- key: "envdevvar2"    
-  value: read from ${basevar2}

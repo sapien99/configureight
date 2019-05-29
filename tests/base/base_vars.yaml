@@ -2,3 +2,5 @@
   value: "basevar1"        
 - key: "basevar2"    
   value: 2
+- key: "stringEight"    
+  value: '8'

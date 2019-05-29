@@ -21,6 +21,18 @@ def possible_abort(e, fail_on_error):
             raise Error(e)
         else:
             sys.exit(8)
+    else:
+        print('WARNING: Exception occured but suppressed:' %e)
+
+def handle_outputformat(args, result):
+    if args.outputformat == 'yaml':
+        output = yaml.dump(result)
+    elif args.outputformat == 'json':
+        output = json.dumps(result, sort_keys=True, indent=2)
+    else:
+        print('Unknown outputformat %s' %args.outputformat)
+        sys.exit(8)        
+    return output
 
 class Error(BaseException): 
 
@@ -144,8 +156,8 @@ class ConfigReader:
 class ConfigResolver:
 
     KEY_IDENTIFIER_RE = re.compile('.*(?<!\\\\)\$\{([\w\.\(\'\"\,\,\-)]+)\}.*')
-    FUNCTION_IDENTIFIER_RE = re.compile('.*(?<!\\\\)\$\(([\\\\\w\.\-\(\"\' \,\)\[\]\:,\-]+)\).*')
-    SCRIPT_IDENTIFIER_RE = re.compile('.*(?<!\\\\)\$\[(\w+):\s([\\\\\w\.\-\(\"\' \,\)\[\]\:,\-]+)\].*')
+    FUNCTION_IDENTIFIER_RE = re.compile('.*(?<!\\\\)\$\(([\\\\\w\.\-\(\"\' \,\)\[\]\:,\-\+]+)\).*')
+    SCRIPT_IDENTIFIER_RE = re.compile('.*(?<!\\\\)\$\[(\w+):([\\\\\w\.\-\(\"\' \,\)\[\]\:,\-\s]*)\].*')
     RE_NAME = re.compile('^[a-zA-Z0-9_\-]+$')
 
     # create a list of save local functions to use
@@ -191,9 +203,9 @@ class ConfigResolver:
                 try:                    
                     value = eval(match_group_function, {"__builtins__": None}, self.safe_dict)
                     if value != None:
-                        key.value = key.value.replace('$(%s)' % match_group_function, value)                            
-                except Exception as e:                    
-                    possible_abort(e, fail_on_error)
+                        key.value = key.value.replace('$(%s)' % match_group_function, str(value))                            
+                except Exception as e:                                        
+                    possible_abort("Inline python >%s< cant be evaluated: %s" %(match_group_function, e), fail_on_error)                    
                     key.value = match_group_function
             return done
 
@@ -210,11 +222,13 @@ class ConfigResolver:
                     command_string = self.script_dict.get(ref)         
                     if command_string:                    
                         start = datetime.now()
+                        LOGGER.debug('Script %s exec >%s<' %(ref, command_string + " ".join([parms])))
                         result = run(command_string.split(' ') + [parms], capture_output=True, timeout=5000, shell=False, stdin=PIPE)                    
                         LOGGER.debug('Script %s took %sms' %(ref, datetime.now() - start))
                         if result.stdout != None:
-                            key.value = key.value.replace('$[%s: %s]' % (ref, parms), result.stdout.decode('utf8'))                            
-                        if result.returncode > 0:
+                            key.value = key.value.replace('$[%s:%s]' % (ref, parms), result.stdout.decode('utf8'))                            
+                        # TODO: why curl gets a RC 3 here even if its works?
+                        if result.returncode > 3:
                             LOGGER.warning('Script %s abended with %s (stdout: %s, stderr: %s)' %(ref, result.returncode, result.stdout, result.stderr))
                             possible_abort("Script %s aborted in key %s" %(ref, result.returncode), fail_on_error)
                     else:                        
@@ -329,7 +343,7 @@ if __name__== "__main__":
     LOGGER.setLevel(ConfigResolver.global_config['loglevel'])
 
     # None will resolve all the keys
-    keys_to_resolve = None
+    keys_to_resolve = []
     if args.inputfile:
         try:
             with open(args.inputfile, 'rb') as file:
@@ -340,17 +354,12 @@ if __name__== "__main__":
     
     # do this on every folder specified and merge    
     keys = ConfigReader(args.path, config=ConfigResolver.global_config).values    
-    if args.origins:        
-        print('--Origins--\n%s' %(json.dumps(ConfigResolver(keys, config=ConfigResolver.global_config).resolve_meta(keys=keys_to_resolve, fail_on_error=False), sort_keys=True, indent=2)))
+    if args.origins:   
+        origins = ConfigResolver(keys, config=ConfigResolver.global_config).resolve_meta(keys=keys_to_resolve, fail_on_error=False)
+        print(handle_outputformat(args, origins))
     else:        
         keyvals = ConfigResolver(keys, config=ConfigResolver.global_config).resolve_keys(keys=keys_to_resolve, fail_on_error=not args.ignoreerrors)
-        if args.outputformat == 'yaml':
-            output = yaml.dump(keyvals)
-        elif args.outputformat == 'json':
-            output = json.dumps(keyvals, sort_keys=True, indent=2)
-        else:
-            print('Unknown outputformat %s' %args.outputformat)
-            sys.exit(8)
+        output = handle_outputformat(args, keyvals)
         
         # care about output
         if args.outputfile:
