@@ -167,6 +167,11 @@ class ConfigResolver:
     safe_dict = dict([ (k, locals().get(k, None)) for k in safe_list ])    
     # dict for external scripts and their shortrefs
     script_dict = {}
+    # the static configuration of ConfigResolver
+    global_config = {
+        'loglevel': logging.WARN,
+        'functions': []
+    }    
 
     def _resolve_key(self, key, level=0, key_nesting=[], fail_on_error=True):
         
@@ -317,10 +322,7 @@ class ConfigResolver:
         key.value = self._resolve_key(key, fail_on_error=fail_on_error)        
         return key
 
-    def __init__(self, key_set, config={}):        
-        ConfigResolver.global_config = {
-           'loglevel': logging.WARN
-        }
+    def __init__(self, key_set, config={}):    
         self.key_set = key_set
         self.config = config
 
@@ -345,7 +347,7 @@ if __name__== "__main__":
     parser.add_argument('--outputformat', action='store', help='<Optional> output format (json or yaml)', default='yaml', required=False)    
     parser.add_argument('--origins', action='store_true', help='<Optional> show value origin instead of resolved value', required=False)    
     parser.add_argument('--ignoreerrors', action='store_true', default=False, help='Continue on errors, will set @@ eyecatcher for errors', required=False)        
-    args = parser.parse_args()
+    args = parser.parse_args()    
     global_config_file = args.config
     # first set logger to info to display info about config location etc.
     if not global_config_file:
