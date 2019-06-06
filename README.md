@@ -1,4 +1,4 @@
-# Configur8
+# Configur&infin;
 [![Build Status](https://travis-ci.org/joemccann/dillinger.svg?branch=master)](https://travis-ci.org/sapien99/configur8)
 
 Configur8 (Configurate) is a tool for generating configuration using overlays and nested variables. It returns a dict of variables which can be the input for resolving templates, helms values.yaml etc. All the mentioned examples are part of the tests folder, so feel free to play around
