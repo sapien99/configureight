@@ -1,7 +1,7 @@
-# Configur&infin;
-[![Build Status](https://travis-ci.org/joemccann/dillinger.svg?branch=master)](https://travis-ci.org/sapien99/configur8)
+# Configur∞;
+[![Build Status](https://travis-ci.org/joemccann/dillinger.svg?branch=master)](https://travis-ci.org/sapien99/configureight)
 
-Configur8 (Configurate) is a tool for generating configuration using overlays and nested variables. It returns a dict of variables which can be the input for resolving templates, helms values.yaml etc. All the mentioned examples are part of the tests folder, so feel free to play around
+Configur∞ (Configurate) basically is a tool for generating configuration using overlays and nested variables. It returns a dict of variables which can be the input for resolving templates, helms values.yaml etc. All the mentioned examples are part of the tests folder, so feel free to play around
 
 ## Usage
 ```sh
@@ -12,7 +12,7 @@ con8.py: error: argument -p/--path is required
 ```
 
 ### Paths and Structure
-configur8 works on a folders containing files which hold config keyvals. Those folders are used for overriding. A simple example could look like the following. The base folder contains general values, envs/dev and envs/prod values for specific environments and apps/app1 contains application specific values. 
+configur∞ works on a folders containing files which hold config keyvals. Those folders are used for overriding. A simple example could look like the following. The base folder contains general values, envs/dev and envs/prod values for specific environments and apps/app1 contains application specific values. 
 
 ```sh
 base 
@@ -34,7 +34,7 @@ con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 -o output.yaml
 ```
 
 ### Defining Variables
-The previous sample mentioned files containing configuration keyvals. Configuration keys can be defined either in json or in yaml - whatever you prefer. You can use the "object-notation" like notation where each variable file contains an array of config key definitions. Beside the key name and its value there is also an optional meta-variable: substituted. Its quite handy when you have sequences like ${}, $(), $[] which are used as eyecatchers by configur8. You can either escape them in the values using a backslash \${} or you can disable the substitution of this key as a whole.
+The previous sample mentioned files containing configuration keyvals. Configuration keys can be defined either in json or in yaml - whatever you prefer. You can use the "object-notation" like notation where each variable file contains an array of config key definitions. Beside the key name and its value there is also an optional meta-variable: substituted. Its quite handy when you have sequences like ${}, $(), $[] which are used as eyecatchers by configur∞. You can either escape them in the values using a backslash \${} or you can disable the substitution of this key as a whole.
 
 ```yaml
 - key: "someKey"    
@@ -109,7 +109,7 @@ If you really want to resolve even in case of an error (an undefined function, a
 con8 -p base -p envs/dev -p envs/devapp1 -p apps/app1 --ignoreerrors
 ```
 ## Tech
-Configur8 is written in python3.6 and is dependent on pyyaml for yaml parsing. Releases for windows and linux (created with pyinstaller) will provide RTR binaries for linux, mac and windows without installing anything
+Configur∞ is written in python3.6 and is dependent on pyyaml for yaml parsing. Releases for windows and linux (created with pyinstaller) will provide RTR binaries for linux, mac and windows without installing anything
 
 ## Installation
 ### python installation
@@ -118,11 +118,11 @@ Fetch python3.6+ and do the usual
 pip install -r requirements.txt
 ```
 ### binary installation
-Just copy the file to your path. Using configur8 you will specify multiple folders as input. .yaml and .json files in those folders will form the base and overlays of your variables. 
+Just copy the file to your path. Using configur∞ you will specify multiple folders as input. .yaml and .json files in those folders will form the base and overlays of your variables. 
 
 ## Principles and Thoughts
 ### General
-Configur8 uses a 2 step aproach to create the final values. The first phase will take care that variables are overridden in the right order, in the second phase the variables will be resolved, taking care of nested keys.
+Configur∞ uses a 2 step aproach to create the final values. The first phase will take care that variables are overridden in the right order, in the second phase the variables will be resolved, taking care of nested keys.
 ```sh
 con8 -p base -p envdev -p subenvdev
 ```
@@ -180,7 +180,7 @@ or something like this
 uppercase_something=$(${lowervasevalue}.upper())
 conversion_to_int=$(int(${eight}))
 ```
-In principle the python builtins are supported, but you can granularly configure the allowed functions using the configur8 config file. 
+In principle the python builtins are supported, but you can granularly configure the allowed functions using the configur∞ config file. 
 ### External script input
 You can pretty easy extend functionality with calling external scripts, fetching data from a webservice, doing some calculations or other stuff that its more difficult than just calling inline python. This example shows how to populate a config key with your external ip - using the api.ipify.org service.
 
