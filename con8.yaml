@@ -1,10 +1,12 @@
-# custom script aliases, references by $[echo: xxx]
+# custom script aliases, references by $[echo: xxx]. Parameters (like xxx) will be passed as further arguments
 scripts:
-  echo: "echo -n ECHOED"  
-  ipify: "curl --silent https://api.ipify.org"  
+  echo: "echo -n ECHOED"
+  curl: "curl --silent"
 # allowed python inline functions
 functions:
   - int  
 # loglevel
 loglevel: DEBUG
-stacks: true
+# key variant (default keyval)
+variant: keyval
+stacks: false

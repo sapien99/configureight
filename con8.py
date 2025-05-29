@@ -116,7 +116,27 @@ class ConfigReader:
                 if obj.enabled:
                     self.values[key] = obj
 
-    def read_keys(self, file):
+    def handle_keyval(self, data, file=None):
+        """
+        handle keyval format
+        {
+          "key1": "some value",
+          "-key1": true # disabled key
+          "*key1": true # private/internal key
+          "§key1": true # no substitution
+        }
+        """        
+        for k, v in data.items():            
+            config_obj = ConfigValue(k, v)
+            config_obj.name = re.search('(\\w+)', k).group(1)
+            config_obj.origin = file
+            config_obj.substitute = not k.startswith('§')
+            config_obj.enabled = not k.startswith('-')
+            if config_obj.enabled:
+                self.values[config_obj.name] = config_obj
+
+    
+    def read_keys(self, file, variant='keyval'):
         _, extension = os.path.splitext(file)
         data = None
         try:
@@ -125,23 +145,28 @@ class ConfigReader:
             if extension in ['.yaml', '.yml']:            
                 data = yaml.safe_load(self.read_file(file))                 
         except Exception as e:
-            LOGGER.error(e)
-        # in case we get key as an object - with metavariables
-        if isinstance(data, list):                
-            self.handle_list(data, file=file)
-        # in case we get key as plain dict
-        else:
+            LOGGER.error(e) 
+        # possible variants of specifying key config       
+        if variant == 'keyval':
+            self.handle_keyval(data, file=file)
+        if variant == 'props':
             self.handle_props(data, file=file)
+        if variant == 'list':
+            self.handle_list(data, file=file)
 
     def gather_facts(self, path, return_value, *args, **nargs):    
-        # TODO: handle file vs path (possibility to specify a certain file)
-        for root, dirs, files in os.walk(path, topdown=False):
-            for name in files:            
-                _, extension = os.path.splitext(name)
-                if extension in ['.yaml','.yml','.json']:
-                    return_value.append(os.path.join(root, name))
-            for dirname in dirs:
-                self.gather_facts(dirname, return_value, *args, **nargs) 
+        if os.path.isfile(path):
+            _, extension = os.path.splitext(path)
+            if extension in ['.yaml','.yml','.json']:
+                return_value.append(path)
+        if os.path.isdir(path):
+            for root, dirs, files in os.walk(path, topdown=False):
+                for name in files:            
+                    _, extension = os.path.splitext(name)
+                    if extension in ['.yaml','.yml','.json']:
+                        return_value.append(os.path.join(root, name))
+                for dirname in dirs:
+                    self.gather_facts(dirname, return_value, *args, **nargs) 
         return return_value
 
     def __init__(self, pathnames, config={}):
@@ -150,14 +175,14 @@ class ConfigReader:
         for pathname in pathnames:
             self.files.extend(self.gather_facts(pathname[0], []))
             for file in self.files:
-                self.read_keys(file)
+                self.read_keys(file, variant=config.get('variant', 'keyval'))
 
 class ConfigResolver:
 
-    KEY_IDENTIFIER_RE = re.compile('.*(?<!\\\\)\$\{([\w\.\(\'\"\,\,\-)]+)\}.*')
-    FUNCTION_IDENTIFIER_RE = re.compile('.*(?<!\\\\)\$\(([\\\\\w\.\-\(\"\' \,\)\[\]\:,\-\+]+)\).*')
-    SCRIPT_IDENTIFIER_RE = re.compile('.*(?<!\\\\)\$\[(\w+):([\\\\\w\.\-\(\"\' \,\)\[\]\:,\-\s]*)\].*')
-    RE_NAME = re.compile('^[a-zA-Z0-9_\-]+$')
+    KEY_IDENTIFIER_RE = r'.*(?<!\\)\$\{([\w\.\(\'\"\,\,\-)]+)\}.*'
+    FUNCTION_IDENTIFIER_RE = r'.*(?<!\\)\$\(([\w\.\-\(\"\' \,\)\[\]\:,\-\+]+)\).*'
+    SCRIPT_IDENTIFIER_RE = r'.*(?<!\\)\$\[(\w+):([\w\.\-\(\"\' \,\)\[\]\:,\-\s/]*)].*'
+    RE_NAME = r'^[a-zA-Z0-9_\-]+$'
 
     # create a list of save local functions to use
     safe_list = ['math','acos', 'asin', 'atan', 'atan2', 'ceil', 'cos', 'cosh', 
@@ -223,10 +248,11 @@ class ConfigResolver:
                 try:
                     ref = match_group_function[0]                    
                     parms = match_group_function[1]    
-                    command_string = self.script_dict.get(ref)         
-                    if command_string:                    
+                    command_string = self.script_dict.get(ref)                       
+                    if command_string:          
+                        subprocess_command = command_string + " " + " ".join([parms])
                         start = datetime.now()
-                        LOGGER.debug('Script %s exec >%s<' %(ref, command_string + " ".join([parms])))
+                        LOGGER.debug('Script %s exec >%s<' %(ref, subprocess_command))
                         subprocess_run = False
                         try:
                             if subprocess.run != None:
@@ -234,9 +260,9 @@ class ConfigResolver:
                         except Exception as e:
                             pass
 
-                        if subprocess_run:
+                        if subprocess_run:                            
                             result = subprocess.run(command_string.split(' ') + [parms], capture_output=True, timeout=5000, shell=False, stdin=subprocess.PIPE)
-                            LOGGER.debug('Script %s took %sms' %(ref, datetime.now() - start))
+                            LOGGER.debug('Script %s took %sms, RC %s' %(ref, datetime.now() - start, result.returncode))
                             if result.stdout != None:
                                 key.value = key.value.replace('$[%s:%s]' % (ref, parms), result.stdout.decode('utf8'))
                             returncode = result.returncode
@@ -254,7 +280,7 @@ class ConfigResolver:
                     else:                        
                         raise Exception("Function %s, used in key >%s< (%s) not found" %(ref, key.name, key.value))
                 except Exception as e:
-                    possible_abort("Function %s, used in key >%s< (%s) not found" %(ref, key.name, key.value), fail_on_error)                    
+                    possible_abort("Exception in Function %s, used in key >%s< (%s) : %s" %(ref, key.name, key.value, e), fail_on_error)                    
                     key.value = key.value.replace('$[%s: %s]' % (ref, parms), '@@UNRESOLVEABLE FUNCTION %s @@' %ref)                                                                    
             return done
 
@@ -299,8 +325,14 @@ class ConfigResolver:
         if len(keys) == 0:
             keys = self.key_set.keys()
         for key in keys:
-            key = self.key_set[key]
-            return_value[key.name] = self.resolve(key, fail_on_error=fail_on_error).value
+            if not self.key_set.get(key):
+                if fail_on_error:
+                    raise Error('Cannot resolve key %s' %key)
+                else:
+                    return_value[key] = None
+            else:
+                key = self.key_set[key]            
+                return_value[key.name] = self.resolve(key, fail_on_error=fail_on_error).value                
         return return_value
 
     def resolve_meta(self, keys=[], fail_on_error=True):
@@ -315,7 +347,7 @@ class ConfigResolver:
     def resolve(self, key, fail_on_error=True):
         """
         Resolve single key        
-        """        
+        """
         #depending if we got a keyname or just a string to resolve we get the value of the string
         if isinstance(key, str):
             key = ConfigValue('_dummy', key)                    
@@ -340,36 +372,42 @@ class ConfigResolver:
 
 if __name__== "__main__":       
     parser = argparse.ArgumentParser()
-    parser.add_argument('-p','--path', nargs='+', action='append', help='<Required> lookup path', required=True)
-    parser.add_argument('-c','--config', action='store', help='<Optional> configuration', required=False)    
-    parser.add_argument('-o', '--outputfile', action='store', help='<Optional> output file', required=False)    
-    parser.add_argument('-i', '--inputfile', action='store', help='<Optional> file with yaml list of variables to resolve', required=False)    
+    parser.add_argument('-p','--path', nargs='+', action='append', help='<Required> path or file containing keyvals', required=True)
+    parser.add_argument('--keysfile', action='store', help='<Optional> file with yaml list of variables to resolve', required=False)    
+    parser.add_argument('--keys', action='store', help='<Optional> comma separated list of variables to resolve', required=False)
     parser.add_argument('--outputformat', action='store', help='<Optional> output format (json or yaml)', default='yaml', required=False)    
     parser.add_argument('--origins', action='store_true', help='<Optional> show value origin instead of resolved value', required=False)    
     parser.add_argument('--ignoreerrors', action='store_true', default=False, help='Continue on errors, will set @@ eyecatcher for errors', required=False)        
-    args = parser.parse_args()    
+    parser.add_argument('-c','--config', action='store', help='<Optional> configuration', required=False)    
+    parser.add_argument('-o', '--outputfile', action='store', help='<Optional> output file', required=False)    
+    args = parser.parse_args()
+
     global_config_file = args.config
     # first set logger to info to display info about config location etc.
     if not global_config_file:
         global_config_file = os.environ.get('CONFIG', os.path.join(os.getcwd(), 'con8.yaml'))
-    if os.path.exists(global_config_file):
+    LOGGER.setLevel('INFO')
+    if os.path.exists(global_config_file):           
         try:
-            with open(global_config_file, 'rb') as file:
-                LOGGER.info('Reading global config from %s' %global_config_file)
+            LOGGER.info('Reading global config from %s' %global_config_file)
+            with open(global_config_file, 'rb') as file:                
                 ConfigResolver.global_config = yaml.safe_load(file.read())                             
         except Exception as e:
-            possible_abort('File %s could not be read: %s' %(args.inputfile, e), True)
+            possible_abort('File %s could not be read: %s' %(global_config_file, e), True)
         LOGGER.setLevel(ConfigResolver.global_config['loglevel'])
 
     # None will resolve all the keys
     keys_to_resolve = []
-    if args.inputfile:
+    if args.keysfile:
         try:
-            with open(args.inputfile, 'rb') as file:
-                LOGGER.info('Reading keys to resolve from from %s' %args.inputfile)
+            with open(args.keysfile, 'rb') as file:
+                LOGGER.info('Reading keys to resolve from from %s' %args.keysfile)
                 keys_to_resolve = yaml.safe_load(file.read())                             
         except Exception as e:
-            possible_abort('File %s could not be read: %s' %(args.inputfile, e), True)
+            possible_abort('File %s could not be read: %s' %(args.keysfile, e), True)
+    if args.keys:        
+        LOGGER.info('Reading keys to resolve from from %s' %args.keys)
+        keys_to_resolve += args.keys.split(',')        
     
     # do this on every folder specified and merge    
     keys = ConfigReader(args.path, config=ConfigResolver.global_config).values    
